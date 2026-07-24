@@ -1,0 +1,282 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Lato', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-serif: 'Oswald', system-ui, sans-serif;
+  --font-heading: 'Oswald', system-ui, sans-serif;
+  --font-oswald: 'Oswald', system-ui, sans-serif;
+  --font-lato: 'Lato', system-ui, sans-serif;
+  --color-brown-400: #b08968;
+  --color-brown-500: #9c6644;
+  --color-brown-600: #7f5539;
+  --color-brown-750: #6f4e37;
+  --color-brown-800: #5c3e2b;
+  --color-brown-900: #4a2e1d;
+}
+
+/* Minimalist UI Look: Condensed Oswald for Headings + Slim Airy Lato for Body & Buttons */
+html, body, p, span, label, input, select, textarea, button, td, li {
+  font-family: 'Lato', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: subpixel-antialiased !important;
+  -moz-osx-font-smoothing: auto !important;
+  text-rendering: geometricPrecision !important;
+  font-smooth: always !important;
+}
+
+h1, h2, h3, h4, h5, h6, th, .font-heading, .font-oswald {
+  font-family: 'Oswald', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.03em;
+}
+
+.font-lato {
+  font-family: 'Lato', system-ui, sans-serif !important;
+  font-weight: 300 !important;
+}
+
+.font-oswald {
+  font-family: 'Oswald', system-ui, sans-serif !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.04em;
+}
+
+/* Dynamic Theme CSS Variables */
+:root {
+  --bg-overlay: rgba(15, 23, 42, 0.35);
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --card-bg: rgba(15, 23, 42, 0.75);
+  --card-hover-bg: rgba(15, 23, 42, 0.90);
+  --card-border: rgba(255, 255, 255, 0.85);
+  --glass-header: rgba(15, 23, 42, 0.85);
+  --map-tile-filter: none;
+}
+
+body {
+  background-image: linear-gradient(rgba(15, 23, 42, 0.35), rgba(15, 23, 42, 0.35)), url('/images/wood_background.png') !important;
+  background-size: cover !important;
+  background-position: center !important;
+  background-attachment: fixed !important;
+  background-repeat: no-repeat !important;
+  background-color: #0f172a !important;
+  color: var(--text-main);
+}
+
+/* Leaflet Map overrides for smooth styling */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  border-radius: 0.75rem;
+  z-index: 10;
+  background: #0f172a !important;
+}
+
+.leaflet-tile {
+  filter: brightness(100%) contrast(100%) !important;
+  -webkit-filter: brightness(100%) contrast(100%) !important;
+}
+
+/* Ensure Leaflet tiles render bright and un-inverted */
+html.dark .leaflet-tile,
+[data-theme='dark'] .leaflet-tile,
+.dark .leaflet-tile {
+  filter: brightness(100%) contrast(100%) !important;
+  -webkit-filter: brightness(100%) contrast(100%) !important;
+}
+
+.leaflet-bar {
+  border: 2px solid rgba(255, 255, 255, 0.8) !important;
+  background-color: rgba(15, 23, 42, 0.8) !important;
+}
+
+.leaflet-bar a {
+  background-color: rgba(15, 23, 42, 0.8) !important;
+  color: #94a3b8 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+.leaflet-bar a:hover {
+  background-color: rgba(30, 41, 59, 0.8) !important;
+  color: #f8fafc !important;
+}
+
+/* White Border Highlight Feature - Panel & Card Styles */
+.glass-card {
+  background: var(--card-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 10px rgba(255, 255, 255, 0.12);
+}
+
+.glass-card:hover, .glass-card-hover:hover {
+  background: var(--card-hover-bg);
+  border-color: #ffffff !important;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 25px -5px rgba(255, 255, 255, 0.3), 0 0 20px rgba(255, 255, 255, 0.25);
+}
+
+.white-border-highlight, .food-card-highlight {
+  border: 2px solid rgba(255, 255, 255, 0.85) !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3), 0 0 10px rgba(255, 255, 255, 0.12);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.white-border-highlight:hover, .food-card-highlight:hover {
+  border-color: #ffffff !important;
+  box-shadow: 0 10px 25px rgba(255, 255, 255, 0.3), 0 0 20px rgba(255, 255, 255, 0.25) !important;
+  transform: translateY(-2px);
+}
+
+/* Touch & Mobile UX Utilities */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.active-press {
+  transition: transform 0.1s ease;
+}
+
+.active-press:active {
+  transform: scale(0.97);
+}
+
+/* Skeleton Loading Shimmer Animation */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.03) 25%,
+    rgba(255, 255, 255, 0.12) 50%,
+    rgba(255, 255, 255, 0.03) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s infinite linear;
+}
+
+/* Map Animated Dash Flow */
+@keyframes dashFlow {
+  from {
+    stroke-dashoffset: 24;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-dashFlow {
+  animation: dashFlow 1.2s linear infinite;
+}
+
+/* Cart Counter Bounce */
+@keyframes cartBounce {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.25); }
+}
+
+.animate-cartBounce {
+  animation: cartBounce 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Animation Keyframes & Classes */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-slideUp {
+  animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-scaleIn {
+  animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #020617;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* Chrome autofill background fix */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #f1f5f9;
+  -webkit-box-shadow: 0 0 0px 1000px #1e293b inset;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* PDF Print styling */
+@media print {
+  body {
+    background: white;
+    color: black;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  .glass-card {
+    border: 1px solid #ccc !important;
+    background: none !important;
+    backdrop-filter: none !important;
+    color: black !important;
+  }
+}
+
