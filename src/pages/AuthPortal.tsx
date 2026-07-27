@@ -162,10 +162,17 @@ export const AuthPortal: React.FC = () => {
       return;
     }
     setGoogleOtpLoading(true);
-    const res = await sendOtp(googleEmailInput.trim(), 'email');
-    setGoogleOtpLoading(false);
-    if (res.success) {
-      setGoogleOtpSent(true);
+    try {
+      const res = await sendOtp(googleEmailInput.trim(), 'email');
+      if (res.success) {
+        setGoogleOtpSent(true);
+      } else {
+        alert(res.message || 'Failed to send OTP code. Please try again.');
+      }
+    } catch (err: any) {
+      alert(err.message || 'OTP request timed out. Please try again.');
+    } finally {
+      setGoogleOtpLoading(false);
     }
   };
 

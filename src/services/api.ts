@@ -34,17 +34,30 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_BASE}${url}`, {
-    ...options,
-    headers,
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`API Request Error [${res.status}]: ${errText}`);
+  try {
+    const res = await fetch(`${API_BASE}${url}`, {
+      ...options,
+      headers,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`API Request Error [${res.status}]: ${errText}`);
+    }
+
+    return res.json();
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error('Network request timed out. Please try again.');
+    }
+    throw err;
   }
-
-  return res.json();
 }
 
 export const api = {

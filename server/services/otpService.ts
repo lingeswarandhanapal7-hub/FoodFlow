@@ -22,17 +22,28 @@ export async function sendOtpViaSmsOrEmail(
 
     if (smtpUser && smtpPass) {
       try {
-        const transporter = nodemailer.createTransport({
-          host: smtpHost,
-          port: smtpPort,
-          secure: smtpPort === 465,
-          auth: {
-            user: smtpUser,
-            pass: smtpPass
-          }
-        });
+        const isGmail = !process.env.SMTP_HOST || process.env.SMTP_HOST.includes('gmail');
+        const transporterConfig: any = isGmail
+          ? {
+              service: 'gmail',
+              auth: { user: smtpUser, pass: smtpPass },
+              connectionTimeout: 5000,
+              greetingTimeout: 4000,
+              socketTimeout: 5000
+            }
+          : {
+              host: process.env.SMTP_HOST,
+              port: Number(process.env.SMTP_PORT) || 587,
+              secure: Number(process.env.SMTP_PORT) === 465,
+              auth: { user: smtpUser, pass: smtpPass },
+              connectionTimeout: 5000,
+              greetingTimeout: 4000,
+              socketTimeout: 5000
+            };
 
-        await transporter.sendMail({
+        const transporter = nodemailer.createTransport(transporterConfig);
+
+        const sendMailPromise = transporter.sendMail({
           from: `"FoodFlow Security" <${smtpUser}>`,
           to: cleanTarget,
           subject: `🔐 FoodFlow Verification Code: ${code}`,
@@ -48,6 +59,12 @@ export async function sendOtpViaSmsOrEmail(
           `
         });
 
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('SMTP connection timed out after 6s')), 6000)
+        );
+
+        await Promise.race([sendMailPromise, timeoutPromise]);
+
         console.log(`[FOODFLOW OTP SERVICE] 📧 Real Email OTP delivered to ${cleanTarget}`);
         return {
           success: true,
@@ -55,7 +72,7 @@ export async function sendOtpViaSmsOrEmail(
           message: `Verification OTP email sent to ${cleanTarget}`
         };
       } catch (err: any) {
-        console.error('[FOODFLOW OTP SERVICE] Email dispatch error:', err.message);
+        console.error('[FOODFLOW OTP SERVICE] Email dispatch error/timeout:', err.message);
       }
     }
   }
