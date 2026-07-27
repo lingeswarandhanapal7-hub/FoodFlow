@@ -15,10 +15,10 @@ export async function sendOtpViaSmsOrEmail(
 
   // 1. Email OTP Dispatch via Nodemailer (SMTP / Gmail / SendGrid)
   if (type === 'email' || cleanTarget.includes('@')) {
-    const smtpUser = process.env.SMTP_USER || process.env.GMAIL_USER;
-    const smtpPass = process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD;
+    const smtpUser = process.env.SMTP_USER || process.env.GMAIL_USER || (process.env as any).GNAIL_USER;
+    const smtpPass = process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD || (process.env as any).GNAIL_APP_PASSWORD;
     const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
-    const smtpPort = Number(process.env.SMTP_PORT) || 465;
+    const smtpPort = Number(process.env.SMTP_PORT) || 587;
 
     if (smtpUser && smtpPass) {
       try {
