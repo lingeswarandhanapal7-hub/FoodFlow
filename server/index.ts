@@ -75,10 +75,14 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   res.status(status).json({ error: message });
 });
 
-app.listen(PORT, () => {
-  console.log(`==================================================`);
-  console.log(`  🚀 FoodFlow Backend Server is running!          `);
-  console.log(`  🛡️ Security: Helmet & Rate-Limiter Enabled      `);
-  console.log(`  📡 API Endpoint: http://localhost:${PORT}/api    `);
-  console.log(`==================================================`);
-});
+export default app;
+
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`==================================================`);
+    console.log(`  🚀 FoodFlow Backend Server is running!          `);
+    console.log(`  🛡️ Security: Helmet & Rate-Limiter Enabled      `);
+    console.log(`  📡 API Endpoint: http://localhost:${PORT}/api    `);
+    console.log(`==================================================`);
+  });
+}
