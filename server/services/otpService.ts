@@ -25,20 +25,25 @@ export async function sendOtpViaSmsOrEmail(
         const isGmail = !process.env.SMTP_HOST || process.env.SMTP_HOST.includes('gmail');
         const transporterConfig: any = isGmail
           ? {
-              service: 'gmail',
+              host: 'smtp.gmail.com',
+              port: 587,
+              secure: false,
+              requireTLS: true,
               auth: { user: smtpUser, pass: smtpPass },
-              connectionTimeout: 5000,
-              greetingTimeout: 4000,
-              socketTimeout: 5000
+              tls: { rejectUnauthorized: false },
+              connectionTimeout: 8000,
+              greetingTimeout: 6000,
+              socketTimeout: 8000
             }
           : {
               host: process.env.SMTP_HOST,
               port: Number(process.env.SMTP_PORT) || 587,
               secure: Number(process.env.SMTP_PORT) === 465,
               auth: { user: smtpUser, pass: smtpPass },
-              connectionTimeout: 5000,
-              greetingTimeout: 4000,
-              socketTimeout: 5000
+              tls: { rejectUnauthorized: false },
+              connectionTimeout: 8000,
+              greetingTimeout: 6000,
+              socketTimeout: 8000
             };
 
         const transporter = nodemailer.createTransport(transporterConfig);

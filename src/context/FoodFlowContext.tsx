@@ -178,7 +178,7 @@ interface FoodFlowContextType {
   login: (userId: string) => boolean;
   register: (name: string, role: AppUser['role'], address: string, lat: number, lng: number, email?: string, phone?: string) => void;
   loginWithGoogle: (payload: { idToken?: string; credential?: string; role?: AppUser['role']; fallbackProfile?: { googleId: string; email: string; name: string; avatar?: string } }) => Promise<void>;
-  sendOtp: (target: string, type?: 'phone' | 'email') => Promise<{ success: boolean; message: string; demoOtp?: string }>;
+  sendOtp: (target: string, type?: 'phone' | 'email') => Promise<{ success: boolean; message: string; provider?: string; demoOtp?: string }>;
   verifyOtp: (target: string, otp: string) => Promise<{ success: boolean; message: string }>;
   logout: () => void;
 }
@@ -1053,6 +1053,7 @@ export const FoodFlowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return {
         success: true,
         message: `6-digit OTP sent to ${target}`,
+        provider: 'dev_sandbox',
         demoOtp
       };
     }
