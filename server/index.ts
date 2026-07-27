@@ -75,6 +75,20 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   res.status(status).json({ error: message });
 });
 
+// Serve frontend build static files in production
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const distPath = path.join(__dirname, '../dist');
+
+app.use(express.static(distPath));
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api')) return next();
+  res.sendFile(path.join(distPath, 'index.html'));
+});
+
 export default app;
 
 if (!process.env.VERCEL) {
