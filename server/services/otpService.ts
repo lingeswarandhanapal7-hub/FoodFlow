@@ -1,10 +1,4 @@
-/**
- * FoodFlow Enterprise OTP Delivery Service
- * Supports:
- * - SMS Gateway Adapters: Twilio, Fast2SMS
- * - Email Gateway Adapters: SMTP / API Gateway
- * - Development Fallback Logger Mode
- */
+import nodemailer from 'nodemailer';
 
 export interface OtpDispatchResult {
   success: boolean;
@@ -19,19 +13,50 @@ export async function sendOtpViaSmsOrEmail(
 ): Promise<OtpDispatchResult> {
   const cleanTarget = target.trim();
 
-  // 1. If Email OTP requested or target contains @
+  // 1. Email OTP Dispatch via Nodemailer (SMTP / Gmail / SendGrid)
   if (type === 'email' || cleanTarget.includes('@')) {
-    const smtpUser = process.env.SMTP_USER;
-    const smtpPass = process.env.SMTP_PASS;
+    const smtpUser = process.env.SMTP_USER || process.env.GMAIL_USER;
+    const smtpPass = process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD;
+    const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
+    const smtpPort = Number(process.env.SMTP_PORT) || 465;
 
     if (smtpUser && smtpPass) {
-      // In production, SMTP gateway dispatch happens here
-      console.log(`[FOODFLOW OTP SERVICE] 📧 SMTP Dispatch -> ${cleanTarget}: Code [${code}]`);
-      return {
-        success: true,
-        provider: 'smtp',
-        message: `OTP email sent to ${cleanTarget}`
-      };
+      try {
+        const transporter = nodemailer.createTransport({
+          host: smtpHost,
+          port: smtpPort,
+          secure: smtpPort === 465,
+          auth: {
+            user: smtpUser,
+            pass: smtpPass
+          }
+        });
+
+        await transporter.sendMail({
+          from: `"FoodFlow Security" <${smtpUser}>`,
+          to: cleanTarget,
+          subject: `🔐 FoodFlow Verification Code: ${code}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 24px; background-color: #0f172a; color: #f8fafc; border-radius: 16px; border: 1px solid #1e293b;">
+              <h2 style="color: #ffffff; font-size: 20px; margin-bottom: 8px;">FoodFlow Verification</h2>
+              <p style="color: #94a3b8; font-size: 14px;">Your 6-digit verification code is:</p>
+              <div style="text-align: center; margin: 24px 0;">
+                <span style="font-family: monospace; font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #fbbf24; background-color: #1e293b; padding: 12px 24px; border-radius: 12px; border: 1px solid #334155; display: inline-block;">${code}</span>
+              </div>
+              <p style="color: #64748b; font-size: 12px; text-align: center;">Expires in 5 minutes. Do not share this code with anyone.</p>
+            </div>
+          `
+        });
+
+        console.log(`[FOODFLOW OTP SERVICE] 📧 Real Email OTP delivered to ${cleanTarget}`);
+        return {
+          success: true,
+          provider: 'smtp',
+          message: `Verification OTP email sent to ${cleanTarget}`
+        };
+      } catch (err: any) {
+        console.error('[FOODFLOW OTP SERVICE] Email dispatch error:', err.message);
+      }
     }
   }
 

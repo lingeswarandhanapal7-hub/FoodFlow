@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useFoodFlow, type AppUser } from '../context/FoodFlowContext';
-import { Leaf, Utensils, User, HeartHandshake, Shield, Sparkles, MapPin, Zap, CheckCircle2, Mail, ArrowRight, RefreshCw, X } from 'lucide-react';
+import { Leaf, Utensils, User, HeartHandshake, Shield, Sparkles, MapPin, Zap, CheckCircle2, Mail, RefreshCw, X } from 'lucide-react';
 
 declare global {
   interface Window {
@@ -39,11 +39,13 @@ export const AuthPortal: React.FC = () => {
   const [isOtpVerified, setIsOtpVerified] = useState(false);
   const [otpTimer, setOtpTimer] = useState(60);
   const [otpLoading, setOtpLoading] = useState(false);
-  const [demoOtpHint, setDemoOtpHint] = useState<string | null>(null);
 
   // Google Modal State
   const [showGoogleModal, setShowGoogleModal] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
+  const [googleEmailInput, setGoogleEmailInput] = useState('');
+  const [googleOtpSent, setGoogleOtpSent] = useState(false);
+  const [googleOtpDigits, setGoogleOtpDigits] = useState(['', '', '', '', '', '']);
+  const [googleOtpLoading, setGoogleOtpLoading] = useState(false);
 
   // OTP Countdown Timer Effect
   useEffect(() => {
@@ -69,11 +71,6 @@ export const AuthPortal: React.FC = () => {
     if (res.success) {
       setOtpSent(true);
       setOtpTimer(60);
-      if (res.demoOtp) {
-        setDemoOtpHint(res.demoOtp);
-        // Pre-fill digits in sandbox mode for smooth user experience
-        setOtpDigits(res.demoOtp.split(''));
-      }
     }
   };
 
@@ -132,13 +129,13 @@ export const AuthPortal: React.FC = () => {
           client_id: clientId,
           callback: async (response: any) => {
             if (response.credential) {
-              setGoogleLoading(true);
+              setGoogleOtpLoading(true);
               await loginWithGoogle({
                 idToken: response.credential,
                 credential: response.credential,
                 role: regRole || 'customer'
               });
-              setGoogleLoading(false);
+              setGoogleOtpLoading(false);
             }
           }
         });
@@ -159,10 +156,38 @@ export const AuthPortal: React.FC = () => {
     }
   }, [regRole]);
 
-  const handleSimulatedGoogleSignIn = async (email: string, name: string) => {
-    setGoogleLoading(true);
+  const handleSendGoogleOtp = async () => {
+    if (!googleEmailInput.trim() || !googleEmailInput.includes('@')) {
+      alert('Please enter a valid Google Account email address to receive OTP.');
+      return;
+    }
+    setGoogleOtpLoading(true);
+    const res = await sendOtp(googleEmailInput.trim(), 'email');
+    setGoogleOtpLoading(false);
+    if (res.success) {
+      setGoogleOtpSent(true);
+    }
+  };
+
+  const handleVerifyGoogleOtpAndLogin = async () => {
+    const code = googleOtpDigits.join('');
+    if (code.length < 6) {
+      alert('Please enter the full 6-digit OTP code sent to your Google Account email.');
+      return;
+    }
+    setGoogleOtpLoading(true);
+    const otpRes = await verifyOtp(googleEmailInput.trim(), code);
+    if (!otpRes.success) {
+      setGoogleOtpLoading(false);
+      alert(otpRes.message || 'Invalid verification code. Please check your inbox.');
+      return;
+    }
+
+    const email = googleEmailInput.trim();
+    const name = email.split('@')[0];
     const googleId = `g-${Date.now()}`;
     const demoToken = createDemoIdToken(email, name, googleId);
+
     await loginWithGoogle({
       idToken: demoToken,
       credential: demoToken,
@@ -174,7 +199,8 @@ export const AuthPortal: React.FC = () => {
         avatar: '🌐'
       }
     });
-    setGoogleLoading(false);
+
+    setGoogleOtpLoading(false);
     setShowGoogleModal(false);
   };
 
@@ -418,12 +444,6 @@ export const AuthPortal: React.FC = () => {
                 {/* 6-Digit Code Input Section */}
                 {otpSent && !isOtpVerified && (
                   <div className="mt-2 flex flex-col gap-2 pt-2 border-t border-slate-850">
-                    {demoOtpHint && (
-                      <div className="text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-lg">
-                        Demo OTP Code: <strong className="font-mono text-xs text-white">{demoOtpHint}</strong>
-                      </div>
-                    )}
-
                     <div className="flex justify-between items-center">
                       <span className="text-[10px] text-slate-400 font-medium">Enter 6-Digit Verification Code:</span>
                       <span className="text-[10px] text-slate-500 font-mono">Expires in: {otpTimer}s</span>
@@ -500,68 +520,92 @@ export const AuthPortal: React.FC = () => {
                 <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
               </svg>
               <div>
-                <h3 className="text-base font-bold text-white">Sign in with Google</h3>
-                <p className="text-[11px] text-slate-400">Choose an account to continue to FoodFlow</p>
+                <h3 className="text-base font-bold text-white">Google Account Sign In</h3>
+                <p className="text-[11px] text-slate-400">Enter your Google Account email to receive verification OTP</p>
               </div>
             </div>
 
-            <div className="flex flex-col gap-2 mt-6">
-              <button
-                onClick={() => handleSimulatedGoogleSignIn('aarav.mehta@gmail.com', 'Aarav Mehta')}
-                disabled={googleLoading}
-                className="p-3 bg-slate-950 hover:bg-slate-850 border border-slate-800 rounded-xl flex items-center justify-between text-left transition-all group"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-sky-500/20 text-sky-400 font-bold flex items-center justify-center text-xs">
-                    AM
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-white">Aarav Mehta</div>
-                    <div className="text-[10px] text-slate-500">aarav.mehta@gmail.com</div>
-                  </div>
+            <div className="flex flex-col gap-3 mt-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Google Account Email</label>
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    placeholder="e.g. yourname@gmail.com"
+                    value={googleEmailInput}
+                    disabled={googleOtpSent}
+                    onChange={e => setGoogleEmailInput(e.target.value)}
+                    className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-sky-500 font-semibold disabled:opacity-60"
+                  />
+                  {!googleOtpSent && (
+                    <button
+                      type="button"
+                      onClick={handleSendGoogleOtp}
+                      disabled={googleOtpLoading || !googleEmailInput.includes('@')}
+                      className="px-3 py-2 bg-sky-600/20 hover:bg-sky-600/30 border border-sky-600/40 text-sky-300 font-extrabold text-xs rounded-xl transition-all disabled:opacity-50 flex items-center gap-1"
+                    >
+                      {googleOtpLoading ? <RefreshCw size={12} className="animate-spin" /> : <Mail size={12} />}
+                      <span>Send OTP</span>
+                    </button>
+                  )}
                 </div>
-                <ArrowRight size={14} className="text-slate-600 group-hover:text-white transition-all" />
-              </button>
+              </div>
 
-              <button
-                onClick={() => handleSimulatedGoogleSignIn('spicegarden.blr@gmail.com', 'Spice Garden Restaurant')}
-                disabled={googleLoading}
-                className="p-3 bg-slate-950 hover:bg-slate-850 border border-slate-800 rounded-xl flex items-center justify-between text-left transition-all group"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-brown-500/20 text-brown-400 font-bold flex items-center justify-center text-xs">
-                    SG
+              {/* 6-Digit OTP Code Verification Input for Google Account */}
+              {googleOtpSent && (
+                <div className="flex flex-col gap-2 pt-2 border-t border-slate-800 animate-fadeIn">
+                  <div className="text-[11px] text-emerald-400 font-medium">
+                    ✉️ 6-Digit Verification OTP Code sent to <strong>{googleEmailInput}</strong>. Please check your inbox.
                   </div>
-                  <div>
-                    <div className="text-xs font-bold text-white">Spice Garden Restaurant</div>
-                    <div className="text-[10px] text-slate-500">spicegarden.blr@gmail.com</div>
+                  <div className="flex justify-between items-center mt-1">
+                    <span className="text-[10px] text-slate-400 font-medium">Enter 6-Digit OTP Code:</span>
                   </div>
-                </div>
-                <ArrowRight size={14} className="text-slate-600 group-hover:text-white transition-all" />
-              </button>
+                  <div className="flex gap-1.5 justify-between">
+                    {googleOtpDigits.map((digit, idx) => (
+                      <input
+                        key={idx}
+                        type="text"
+                        maxLength={1}
+                        value={digit}
+                        onChange={e => {
+                          const val = e.target.value;
+                          const nextDigits = [...googleOtpDigits];
+                          nextDigits[idx] = val;
+                          setGoogleOtpDigits(nextDigits);
+                          if (val && idx < 5) {
+                            document.getElementById(`google-otp-input-${idx + 1}`)?.focus();
+                          }
+                        }}
+                        id={`google-otp-input-${idx}`}
+                        className="w-9 h-10 bg-slate-950 border border-slate-800 rounded-lg text-center font-mono font-bold text-sm text-white focus:outline-none focus:border-sky-500"
+                      />
+                    ))}
+                  </div>
 
-              <button
-                onClick={() => handleSimulatedGoogleSignIn('hope.shelter.ngo@gmail.com', 'Hope Food Shelter')}
-                disabled={googleLoading}
-                className="p-3 bg-slate-950 hover:bg-slate-850 border border-slate-800 rounded-xl flex items-center justify-between text-left transition-all group"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-rose-500/20 text-rose-400 font-bold flex items-center justify-center text-xs">
-                    HS
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-white">Hope Food Shelter NGO</div>
-                    <div className="text-[10px] text-slate-500">hope.shelter.ngo@gmail.com</div>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={handleVerifyGoogleOtpAndLogin}
+                    disabled={googleOtpLoading}
+                    className="w-full mt-2 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs py-2.5 rounded-xl transition-all shadow-md shadow-emerald-600/20 flex items-center justify-center gap-1.5"
+                  >
+                    {googleOtpLoading ? <RefreshCw size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
+                    <span>Verify & Sign In with Google</span>
+                  </button>
                 </div>
-                <ArrowRight size={14} className="text-slate-600 group-hover:text-white transition-all" />
-              </button>
+              )}
             </div>
 
-            <div className="mt-6 pt-4 border-t border-slate-800 text-center">
+            <div className="mt-6 pt-4 border-t border-slate-800 text-center flex items-center justify-between">
               <span className="text-[10px] text-slate-500">
-                FoodFlow OAuth 2.0 Client • Secured with Google Identity Services
+                FoodFlow Security • Real OTP Verified Authentication
               </span>
+              <button
+                type="button"
+                onClick={() => setGoogleOtpSent(false)}
+                className="text-[10px] text-slate-400 hover:text-white underline"
+              >
+                Change Email
+              </button>
             </div>
           </div>
         </div>
