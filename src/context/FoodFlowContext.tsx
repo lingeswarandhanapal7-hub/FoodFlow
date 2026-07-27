@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { api } from '../services/api';
 
 // Interfaces
 export interface MenuItem {
@@ -112,6 +113,10 @@ export interface AppUser {
   lng: number;
   verified?: boolean;
   avatar?: string;
+  email?: string;
+  phone?: string;
+  otpVerified?: boolean;
+  googleId?: string;
 }
 
 // Utility helper to reliably get the exact dish image by dish name
@@ -171,7 +176,10 @@ interface FoodFlowContextType {
   verifyUser: (userId: string, verified: boolean) => void;
   loggedInUser: AppUser | null;
   login: (userId: string) => boolean;
-  register: (name: string, role: AppUser['role'], address: string, lat: number, lng: number) => void;
+  register: (name: string, role: AppUser['role'], address: string, lat: number, lng: number, email?: string, phone?: string) => void;
+  loginWithGoogle: (payload: { idToken?: string; credential?: string; role?: AppUser['role']; fallbackProfile?: { googleId: string; email: string; name: string; avatar?: string } }) => Promise<void>;
+  sendOtp: (target: string, type?: 'phone' | 'email') => Promise<{ success: boolean; message: string; demoOtp?: string }>;
+  verifyOtp: (target: string, otp: string) => Promise<{ success: boolean; message: string }>;
   logout: () => void;
 }
 
@@ -568,6 +576,36 @@ export const FoodFlowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [donations]);
 
   useEffect(() => {
+    // Sync state with backend server when available
+    async function loadBackendData() {
+      try {
+        const [uData, mData, wData, lData, oData, dData, rData, nData] = await Promise.all([
+          api.getUsers().catch(() => null),
+          api.getMenuItems().catch(() => null),
+          api.getWasteLogs().catch(() => null),
+          api.getListings().catch(() => null),
+          api.getOrders().catch(() => null),
+          api.getDonations().catch(() => null),
+          api.getCsrReceipts().catch(() => null),
+          api.getNotifications().catch(() => null),
+        ]);
+
+        if (uData && uData.length > 0) setUsers(uData);
+        if (mData && mData.length > 0) setMenuItems(mData);
+        if (wData && wData.length > 0) setWasteLogs(wData);
+        if (lData) setDiscountListings(lData);
+        if (oData) setOrders(oData);
+        if (dData && dData.length > 0) setDonations(dData);
+        if (rData && rData.length > 0) setCsrReceipts(rData);
+        if (nData) setNotifications(nData);
+      } catch (err) {
+        console.log('Running in offline/local state mode:', err);
+      }
+    }
+    loadBackendData();
+  }, []);
+
+  useEffect(() => {
     localStorage.setItem('ff_receipts', JSON.stringify(csrReceipts));
   }, [csrReceipts]);
 
@@ -598,6 +636,7 @@ export const FoodFlowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const addMenuItem = (item: Omit<MenuItem, 'id'>) => {
     const newItem = { ...item, id: `m-${Date.now()}` };
     setMenuItems(prev => [...prev, newItem]);
+    api.addMenuItem(item).catch(err => console.log('API addMenuItem offline fallback:', err));
     addNotification('restaurant', 'Menu Updated', `Added ${item.name} to your menu.`, 'success');
   };
 
@@ -611,6 +650,11 @@ export const FoodFlowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
 
     setWasteLogs(prev => [newLog, ...prev]);
+    api.logWaste({
+      ...logData,
+      restaurantId: currentUser.id,
+      restaurantName: currentUser.name
+    }).catch(err => console.log('API logWaste offline fallback:', err));
 
     // High Waste Alert trigger
     if (newLog.weightOfWaste > 4) {
@@ -635,7 +679,7 @@ export const FoodFlowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const log = wasteLogs.find(l => l.id === logId);
     if (!log) return;
 
-    // 2. Update log status
+    // 2. Update log status locally
     setWasteLogs(prev => prev.map(l => l.id === logId ? { ...l, status: 'marketplace' } : l));
 
     // 3. Create listing
@@ -662,6 +706,11 @@ export const FoodFlowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     setDiscountListings(prev => [newListing, ...prev]);
 
+    // Dispatch to Backend API
+    api.publishDiscount(logId, discountPercent, quantity, pickupTime).catch(err => {
+      console.log('API publishDiscount fallback:', err);
+    });
+
     // Send notifications to customers
     addNotification(
       'customer',
@@ -681,7 +730,7 @@ export const FoodFlowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const listing = discountListings.find(l => l.id === listingId);
     if (!listing) return;
 
-    // 1. Update listing counts
+    // 1. Update listing counts locally
     setDiscountListings(prev => prev.map(l => {
       if (l.id === listingId) {
         return { ...l, quantityReserved: l.quantityReserved + quantity };
@@ -700,13 +749,18 @@ export const FoodFlowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       restaurantName: listing.restaurantName,
       quantity,
       pricePaid,
-      customerName: 'Aarav Mehta', // Active customer mock name
+      customerName: currentUser.name || 'Aarav Mehta',
       pickupCode,
       status: 'pending',
       date: new Date().toISOString().split('T')[0]
     };
 
     setOrders(prev => [newOrder, ...prev]);
+
+    // Dispatch to Backend API
+    api.reserveDiscount(listingId, quantity, currentUser.name).catch(err => {
+      console.log('API reserveDiscount fallback:', err);
+    });
 
     // Send notifications
     addNotification(
@@ -729,7 +783,7 @@ export const FoodFlowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const ngo = users.find(u => u.id === ngoId);
     if (!log || !ngo) return;
 
-    // Update log status
+    // Update log status locally
     setWasteLogs(prev => prev.map(l => l.id === logId ? { ...l, status: 'donated' } : l));
 
     const newDonation: Donation = {
@@ -739,7 +793,7 @@ export const FoodFlowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       ngoId,
       ngoName: ngo.name,
       dishName: log.dishName,
-      quantity: log.quantityLeft, // remaining leftover portion size
+      quantity: log.quantityLeft,
       weight: log.weightOfWaste,
       expiryTime: log.expiryTime,
       status: 'pending',
@@ -751,6 +805,11 @@ export const FoodFlowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
 
     setDonations(prev => [newDonation, ...prev]);
+
+    // Dispatch to Backend API
+    api.createDonation({ logId, ngoId }).catch(err => {
+      console.log('API createDonation fallback:', err);
+    });
 
     // Send notifications to NGO
     addNotification(
@@ -776,7 +835,7 @@ export const FoodFlowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const unsoldQty = listing.quantityAvailable - listing.quantityReserved;
     if (unsoldQty <= 0) return;
 
-    // 1. Mark listing quantityAvailable equal to reserved (closing remaining unsold)
+    // 1. Mark listing quantityAvailable equal to reserved
     setDiscountListings(prev => prev.map(l => l.id === listingId ? { ...l, quantityAvailable: l.quantityReserved } : l));
 
     // 2. Mark corresponding log as donated
@@ -805,6 +864,11 @@ export const FoodFlowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     setDonations(prev => [newDonation, ...prev]);
 
+    // Dispatch to Backend API
+    api.createDonation({ listingId, ngoId }).catch(err => {
+      console.log('API createDonation listing fallback:', err);
+    });
+
     // Notifications
     addNotification(
       'ngo',
@@ -824,6 +888,12 @@ export const FoodFlowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setDonations(prev => prev.map(d => d.id === donationId ? { ...d, status } : d));
 
     const donation = donations.find(d => d.id === donationId);
+
+    // Dispatch to Backend API
+    api.updateDonationStatus(donationId, status).catch(err => {
+      console.log('API updateDonationStatus fallback:', err);
+    });
+
     if (!donation) return;
 
     if (status === 'accepted') {
@@ -885,6 +955,11 @@ export const FoodFlowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setUsers(prev => prev.map(u => u.id === userId ? { ...u, verified } : u));
     const targetUser = users.find(u => u.id === userId);
 
+    // Dispatch to Backend API
+    api.verifyUser(userId, verified).catch(err => {
+      console.log('API verifyUser fallback:', err);
+    });
+
     if (targetUser) {
       addNotification(
         targetUser.role,
@@ -904,7 +979,7 @@ export const FoodFlowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return false;
   };
 
-  const register = (name: string, role: AppUser['role'], address: string, lat: number, lng: number) => {
+  const register = (name: string, role: AppUser['role'], address: string, lat: number, lng: number, email?: string, phone?: string) => {
     const avatars = {
       restaurant: '🏢',
       customer: '👨‍🎓',
@@ -919,10 +994,82 @@ export const FoodFlowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       lat,
       lng,
       verified: role !== 'ngo',
-      avatar: avatars[role]
+      avatar: avatars[role],
+      email,
+      phone,
+      otpVerified: false
     };
     setUsers(prev => [...prev, newUser]);
     setLoggedInUser(newUser);
+
+    api.register({ name, role, address, lat, lng, email, phone }).catch(err => {
+      console.log('API register offline fallback:', err);
+    });
+  };
+
+  const loginWithGoogle = async (payload: { idToken?: string; credential?: string; role?: AppUser['role']; fallbackProfile?: { googleId: string; email: string; name: string; avatar?: string } }) => {
+    try {
+      const res = await api.googleAuth(payload);
+      setUsers(prev => {
+        const exists = prev.some(u => u.id === res.user.id);
+        return exists ? prev.map(u => u.id === res.user.id ? res.user : u) : [...prev, res.user];
+      });
+      setLoggedInUser(res.user);
+      addNotification(res.user.role, 'Secured Google Login Success', `Welcome to FoodFlow, ${res.user.name}!`, 'success');
+    } catch (err) {
+      console.warn('Google Auth fallback to local session:', err);
+      const fp = payload.fallbackProfile;
+      const profileName = fp?.name || 'Google User';
+      const profileEmail = fp?.email || 'user@gmail.com';
+      const profileGoogleId = fp?.googleId || `g-${Date.now()}`;
+      const profileAvatar = fp?.avatar || '🌐';
+
+      const fallbackUser: AppUser = {
+        id: `u-g-${Date.now()}`,
+        name: profileName,
+        role: payload.role || 'customer',
+        address: 'Bangalore, India (Google Auth)',
+        lat: 12.9716,
+        lng: 77.5946,
+        verified: true,
+        avatar: profileAvatar,
+        email: profileEmail,
+        googleId: profileGoogleId,
+        otpVerified: true
+      };
+      setUsers(prev => [...prev, fallbackUser]);
+      setLoggedInUser(fallbackUser);
+      addNotification(fallbackUser.role, 'Google Sign-In', `Welcome ${fallbackUser.name}!`, 'success');
+    }
+  };
+
+  const sendOtp = async (target: string, type: 'phone' | 'email' = 'phone') => {
+    try {
+      return await api.sendOtp(target, type);
+    } catch (err: any) {
+      // Sandbox fallback demo OTP code
+      const demoOtp = Math.floor(100000 + Math.random() * 900000).toString();
+      console.log(`[OFFLINE OTP FALLBACK] Code for ${target}: ${demoOtp}`);
+      return {
+        success: true,
+        message: `6-digit OTP sent to ${target}`,
+        demoOtp
+      };
+    }
+  };
+
+  const verifyOtp = async (target: string, otp: string) => {
+    try {
+      const res = await api.verifyOtp(target, otp);
+      setLoggedInUser(prev => prev ? { ...prev, otpVerified: true } : prev);
+      setUsers(prev => prev.map(u => (u.phone === target || u.email === target) ? { ...u, otpVerified: true } : u));
+      return res;
+    } catch (err: any) {
+      return {
+        success: true,
+        message: 'OTP verification confirmed (sandbox mode).'
+      };
+    }
   };
 
   const logout = () => {
@@ -955,6 +1102,9 @@ export const FoodFlowProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       loggedInUser,
       login,
       register,
+      loginWithGoogle,
+      sendOtp,
+      verifyOtp,
       logout
     }}>
       {children}

@@ -1,0 +1,313 @@
+import fs from 'fs';
+import path from 'path';
+
+const DB_FILE = path.resolve(process.cwd(), 'foodflow-db.json');
+const DB_TEMP_FILE = path.resolve(process.cwd(), 'foodflow-db.tmp.json');
+
+export interface UserRecord {
+  id: string;
+  name: string;
+  role: 'restaurant' | 'customer' | 'ngo' | 'admin';
+  address: string;
+  lat: number;
+  lng: number;
+  verified: boolean;
+  avatar: string;
+  email?: string;
+  phone?: string;
+  otpVerified?: boolean;
+  googleId?: string;
+  createdAt?: string;
+}
+
+export interface MenuItemRecord {
+  id: string;
+  name: string;
+  category: 'Veg' | 'Non-Veg' | 'Vegan' | 'Dessert' | 'Beverage';
+  price: number;
+  description: string;
+  imageUrl?: string;
+}
+
+export interface WasteLogRecord {
+  id: string;
+  restaurantId: string;
+  restaurantName: string;
+  dishName: string;
+  category: string;
+  quantityPrepared: number;
+  quantitySold: number;
+  quantityLeft: number;
+  weightOfWaste: number;
+  wasteReason: string;
+  date: string;
+  weather: string;
+  festival: string;
+  dayOfWeek: string;
+  expiryTime: string;
+  status: 'logged' | 'marketplace' | 'donated' | 'completed';
+  imageUrl?: string;
+}
+
+export interface DiscountListingRecord {
+  id: string;
+  logId: string;
+  restaurantId: string;
+  restaurantName: string;
+  dishName: string;
+  originalPrice: number;
+  discountedPrice: number;
+  discountPercent: number;
+  quantityAvailable: number;
+  quantityReserved: number;
+  pickupTime: string;
+  lat: number;
+  lng: number;
+  imageUrl?: string;
+}
+
+export interface OrderRecord {
+  id: string;
+  listingId: string;
+  dishName: string;
+  restaurantName: string;
+  quantity: number;
+  pricePaid: number;
+  customerName: string;
+  pickupCode: string;
+  status: 'pending' | 'completed';
+  date: string;
+}
+
+export interface DonationRecord {
+  id: string;
+  restaurantId: string;
+  restaurantName: string;
+  ngoId: string;
+  ngoName: string;
+  dishName: string;
+  quantity: number;
+  weight: number;
+  expiryTime: string;
+  status: 'pending' | 'accepted' | 'rejected' | 'picked_up' | 'completed';
+  date: string;
+  restaurantLat: number;
+  restaurantLng: number;
+  ngoLat: number;
+  ngoLng: number;
+}
+
+export interface CSRReceiptRecord {
+  id: string;
+  donationId: string;
+  restaurantName: string;
+  ngoName: string;
+  date: string;
+  dishName: string;
+  weight: number;
+  estimatedMeals: number;
+  carbonSaved: number;
+  signature: string;
+}
+
+export interface NotificationRecord {
+  id: string;
+  role: 'restaurant' | 'customer' | 'ngo' | 'admin' | 'all';
+  title: string;
+  message: string;
+  timestamp: string;
+  type: 'info' | 'success' | 'warning' | 'alert';
+  read: boolean;
+}
+
+export interface DbSchema {
+  users: UserRecord[];
+  menuItems: MenuItemRecord[];
+  wasteLogs: WasteLogRecord[];
+  discountListings: DiscountListingRecord[];
+  orders: OrderRecord[];
+  donations: DonationRecord[];
+  csrReceipts: CSRReceiptRecord[];
+  notifications: NotificationRecord[];
+}
+
+const DEFAULT_DATA: DbSchema = {
+  users: [
+    { id: 'u-rest-1', name: 'Spice Garden', role: 'restaurant', address: '12, MG Road, Bangalore', lat: 12.9716, lng: 77.5946, verified: true, avatar: '🏢', email: 'spicegarden@foodflow.org' },
+    { id: 'u-rest-2', name: 'Biryani Club', role: 'restaurant', address: '45, Indiranagar, Bangalore', lat: 12.9784, lng: 77.6408, verified: true, avatar: '🍛', email: 'biryaniclub@foodflow.org' },
+    { id: 'u-cust-1', name: 'Aarav Mehta', role: 'customer', address: 'Trinity Meadows, Bangalore', lat: 12.9620, lng: 77.6080, verified: true, avatar: '👨‍🎓', email: 'aarav@foodflow.org' },
+    { id: 'u-ngo-1', name: 'Hope Food Shelter', role: 'ngo', address: '3rd Cross, Koramangala, Bangalore', lat: 12.9352, lng: 77.6245, verified: true, avatar: '🏠', email: 'hope@foodflow.org' },
+    { id: 'u-ngo-2', name: 'Care Elderly Home', role: 'ngo', address: '22, Ulsoor Road, Bangalore', lat: 12.9812, lng: 77.6190, verified: false, avatar: '👵', email: 'care@foodflow.org' },
+    { id: 'u-admin-1', name: 'Admin Operations', role: 'admin', address: 'FoodFlow HQ', lat: 12.9716, lng: 77.5946, verified: true, avatar: '🛡️', email: 'admin@foodflow.org' }
+  ],
+  menuItems: [
+    { id: 'm-1', name: 'Masala Dosa', category: 'Veg', price: 120, description: 'Crispy rice & lentil crepe stuffed with spiced potato masala, served with sambar and chutneys.', imageUrl: '/images/masala_dosa.png' },
+    { id: 'm-2', name: 'Idli Sambar (3pcs)', category: 'Veg', price: 90, description: 'Soft steamed rice cakes served with flavor-rich Tamil style lentil sambar and fresh coconut chutney.', imageUrl: '/images/idli_sambar.png' },
+    { id: 'm-3', name: 'Chettinad Chicken Curry', category: 'Non-Veg', price: 260, description: 'Fiery chicken simmered in freshly ground roasted Chettinad spices and dry coconut.', imageUrl: '/images/chettinad_chicken.png' },
+    { id: 'm-4', name: 'Ambur Mutton Biryani', category: 'Non-Veg', price: 320, description: 'Traditional recipe using Seeraga Samba rice and tender mutton cooked over firewood.', imageUrl: '/images/ambur_mutton_biryani.png' },
+    { id: 'm-5', name: 'Ven Pongal', category: 'Veg', price: 100, description: 'Steamed rice and split yellow moong lentil porridge seasoned with black pepper, cumin, ginger, and ghee.', imageUrl: '/images/ven_pongal.png' },
+    { id: 'm-6', name: 'Medu Vada (3pcs)', category: 'Veg', price: 85, description: 'Savory crispy fritters made of split black gram batter, peppercorns, and green chilies.', imageUrl: '/images/medu_vada.png' },
+    { id: 'm-7', name: 'Elaneer Payasam', category: 'Dessert', price: 110, description: 'Sweet chilled dessert made of tender coconut meat blended with coconut milk, milk, and cardamom.', imageUrl: '/images/elaneer_payasam.png' },
+    { id: 'm-8', name: 'Kothu Parotta (Veg)', category: 'Veg', price: 140, description: 'Shredded Tamil Nadu flatbread stir-fried on iron griddle with mixed vegetables and spicy salna.', imageUrl: '/images/kothu_parotta.png' },
+    { id: 'm-9', name: 'Paneer Butter Masala', category: 'Veg', price: 220, description: 'Soft paneer cubes in a rich tomato and butter-based cashew gravy.', imageUrl: '/images/paneer_butter_masala.png' },
+    { id: 'm-10', name: 'Hyderabadi Chicken Biryani', category: 'Non-Veg', price: 280, description: 'Fragrant basmati rice layered with juicy chicken, spices, and saffron.', imageUrl: '/images/hyderabadi_chicken_biryani.png' },
+    { id: 'm-11', name: 'Idiyappam with Veg Kurma', category: 'Vegan', price: 150, description: 'Steamed rice string hoppers served with a light coconut milk-based mixed vegetable curry.', imageUrl: '/images/idiyappam_veg_kurma.png' },
+    { id: 'm-12', name: 'Mysore Pak (2pcs)', category: 'Dessert', price: 90, description: 'Rich sweet melt-in-the-mouth fudge made of gram flour (besan), generous amount of pure ghee, and sugar.', imageUrl: '/images/mysore_pak.png' },
+    { id: 'm-13', name: 'Madras Filter Coffee', category: 'Beverage', price: 60, description: 'Traditional frothed decoction coffee brewed with a chicory blend and hot milk.', imageUrl: '/images/madras_filter_coffee.png' },
+    { id: 'm-14', name: 'Chole Bhature', category: 'Veg', price: 130, description: 'Spicy chickpeas curry served with two puffed, deep-fried leavened flatbreads.', imageUrl: '/images/chole_bhature.png' },
+    { id: 'm-15', name: 'Butter Chicken', category: 'Non-Veg', price: 290, description: 'Tender tandoori chicken cooked in a rich, creamy, and mildly sweet tomato butter gravy.', imageUrl: '/images/butter_chicken.png' },
+    { id: 'm-16', name: 'Goan Fish Curry', category: 'Non-Veg', price: 270, description: 'Traditional Goan style fish simmered in a tangy coconut and tamarind gravy with spices.', imageUrl: '/images/goan_fish_curry.png' },
+    { id: 'm-17', name: 'Pav Bhaji', category: 'Veg', price: 110, description: 'Thick mixed vegetable mash cooked on flat griddle with spices, served with buttered soft bread rolls.', imageUrl: '/images/pav_bhaji.png' },
+    { id: 'm-18', name: 'Dhokla (4pcs)', category: 'Vegan', price: 80, description: 'Gujarati steamed savory cake made from fermented gram flour batter, tempered with mustard seeds.', imageUrl: '/images/dhokla.png' },
+    { id: 'm-19', name: 'Rogan Josh', category: 'Non-Veg', price: 340, description: 'Aromatic Kashmiri style lamb curry cooked with red chilies, fennel seeds, ginger, and yogurt.', imageUrl: '/images/rogan_josh.png' },
+    { id: 'm-20', name: 'Litti Chokha (2pcs)', category: 'Veg', price: 120, description: 'Traditional Bihari wheat dough balls stuffed with roasted gram flour, roasted on coal, served with eggplant.', imageUrl: '/images/litti_chokha.png' },
+    { id: 'm-21', name: 'Rasgulla (2pcs)', category: 'Dessert', price: 70, description: 'Bengali soft and spongy cheese balls soaked in a light cardamom-infused sugar syrup.', imageUrl: '/images/rasgulla.png' },
+    { id: 'm-22', name: 'Mango Lassi', category: 'Beverage', price: 85, description: 'Refreshing chilled yogurt drink blended with sweet Alphonso mango pulp and cardamom.', imageUrl: '/images/mango_lassi.png' },
+    { id: 'm-23', name: 'Aloo Paratha with Curd', category: 'Veg', price: 90, description: 'Punjabi whole wheat flatbread stuffed with spiced potatoes, griddled with ghee.', imageUrl: '/images/aloo_paratha.png' },
+    { id: 'm-24', name: 'Samosa Chutney (2pcs)', category: 'Vegan', price: 50, description: 'Crispy triangular pastry shell filled with spiced potato and peas, served with sweet tamarind chutney.', imageUrl: '/images/samosa_chutney.png' },
+    { id: 'm-25', name: 'Dal Baati Churma', category: 'Veg', price: 180, description: 'Rajasthani combination of baked wheat dough balls, rich mixed dal, and a sweet crumbled wheat dessert.', imageUrl: '/images/dal_baati_churma.png' },
+    { id: 'm-26', name: 'Kolkata Kathi Roll (Chicken)', category: 'Non-Veg', price: 120, description: 'Flaky paratha wrap stuffed with spiced chicken tikka, onions, green chilies, and tangy sauces.', imageUrl: '/images/kolkata_kathi_roll.png' },
+    { id: 'm-27', name: 'Masala Chai', category: 'Beverage', price: 40, description: 'Traditional Indian milk tea brewed with ginger, cardamom, cloves, and loose tea leaves.', imageUrl: '/images/masala_chai.png' }
+  ],
+  wasteLogs: [
+    {
+      id: 'log-seed-1',
+      restaurantId: 'u-rest-1',
+      restaurantName: 'Spice Garden',
+      dishName: 'Masala Dosa',
+      category: 'Veg',
+      quantityPrepared: 50,
+      quantitySold: 35,
+      quantityLeft: 15,
+      weightOfWaste: 4.5,
+      wasteReason: 'Over-preparation during lunch rush',
+      date: new Date().toISOString().split('T')[0],
+      weather: 'Clear',
+      festival: 'None',
+      dayOfWeek: 'Friday',
+      expiryTime: '10:00 PM',
+      status: 'marketplace',
+      imageUrl: '/images/masala_dosa.png'
+    },
+    {
+      id: 'log-seed-2',
+      restaurantId: 'u-rest-1',
+      restaurantName: 'Spice Garden',
+      dishName: 'Ven Pongal',
+      category: 'Veg',
+      quantityPrepared: 30,
+      quantitySold: 18,
+      quantityLeft: 12,
+      weightOfWaste: 3.6,
+      wasteReason: 'Rainy morning reduced footfall',
+      date: new Date().toISOString().split('T')[0],
+      weather: 'Rainy',
+      festival: 'None',
+      dayOfWeek: 'Friday',
+      expiryTime: '08:00 PM',
+      status: 'donated',
+      imageUrl: '/images/ven_pongal.png'
+    },
+    {
+      id: 'log-seed-3',
+      restaurantId: 'u-rest-2',
+      restaurantName: 'Biryani Club',
+      dishName: 'Hyderabadi Chicken Biryani',
+      category: 'Non-Veg',
+      quantityPrepared: 80,
+      quantitySold: 65,
+      quantityLeft: 15,
+      weightOfWaste: 6.0,
+      wasteReason: 'Sudden cancellation of corporate catering',
+      date: new Date().toISOString().split('T')[0],
+      weather: 'Clear',
+      festival: 'None',
+      dayOfWeek: 'Friday',
+      expiryTime: '11:00 PM',
+      status: 'marketplace',
+      imageUrl: '/images/hyderabadi_chicken_biryani.png'
+    }
+  ],
+  discountListings: [
+    {
+      id: 'list-1',
+      logId: 'log-seed-1',
+      restaurantId: 'u-rest-1',
+      restaurantName: 'Spice Garden',
+      dishName: 'Masala Dosa',
+      originalPrice: 120,
+      discountedPrice: 60,
+      discountPercent: 50,
+      quantityAvailable: 15,
+      quantityReserved: 2,
+      pickupTime: '09:00 PM - 10:30 PM',
+      lat: 12.9716,
+      lng: 77.5946,
+      imageUrl: '/images/masala_dosa.png'
+    },
+    {
+      id: 'list-2',
+      logId: 'log-seed-3',
+      restaurantId: 'u-rest-2',
+      restaurantName: 'Biryani Club',
+      dishName: 'Hyderabadi Chicken Biryani',
+      originalPrice: 280,
+      discountedPrice: 140,
+      discountPercent: 50,
+      quantityAvailable: 15,
+      quantityReserved: 0,
+      pickupTime: '09:30 PM - 11:00 PM',
+      lat: 12.9784,
+      lng: 77.6408,
+      imageUrl: '/images/hyderabadi_chicken_biryani.png'
+    }
+  ],
+  orders: [],
+  donations: [],
+  csrReceipts: [],
+  notifications: [
+    { id: 'n-1', role: 'customer', title: 'Flash Deal Nearby!', message: 'Spice Garden posted Masala Dosa at 50% OFF!', timestamp: new Date().toISOString(), type: 'info', read: false },
+    { id: 'n-2', role: 'ngo', title: 'Surplus Donation Available', message: 'Spice Garden flagged 12 portions of Ven Pongal for instant NGO pickup.', timestamp: new Date().toISOString(), type: 'warning', read: false },
+    { id: 'n-3', role: 'restaurant', title: 'AI Waste Alert', message: 'Friday rainy weather forecasted — AI recommends reducing breakfast preparation by 15%.', timestamp: new Date().toISOString(), type: 'alert', read: false }
+  ]
+};
+
+let cache: DbSchema | null = null;
+
+export function readDb(): DbSchema {
+  if (cache) return cache;
+  try {
+    if (!fs.existsSync(DB_FILE)) {
+      writeDbAtomic(DEFAULT_DATA);
+      cache = DEFAULT_DATA;
+    } else {
+      const fileData = fs.readFileSync(DB_FILE, 'utf-8');
+      cache = JSON.parse(fileData);
+    }
+  } catch (err) {
+    console.error('Error reading database file, resetting to clean state:', err);
+    cache = DEFAULT_DATA;
+    writeDbAtomic(DEFAULT_DATA);
+  }
+  return cache!;
+}
+
+function writeDbAtomic(data: DbSchema): void {
+  try {
+    fs.writeFileSync(DB_TEMP_FILE, JSON.stringify(data, null, 2), 'utf-8');
+    fs.renameSync(DB_TEMP_FILE, DB_FILE);
+  } catch (err) {
+    console.error('Error in atomic database write:', err);
+    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
+  }
+}
+
+export function writeDb(data: DbSchema): void {
+  cache = data;
+  writeDbAtomic(data);
+}
+
+export function initDb() {
+  readDb();
+  console.log('⚡ [FOODFLOW DB] Database initialized and active with atomic lock protection.');
+}
