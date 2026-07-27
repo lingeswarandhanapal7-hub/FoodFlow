@@ -78,23 +78,23 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 // Serve frontend build static files in production
 import path from 'path';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const distPath = path.join(__dirname, '../dist');
-const indexPath = path.join(distPath, 'index.html');
+const distPath = path.resolve(process.cwd(), 'dist');
+const indexPath = path.resolve(distPath, 'index.html');
+
+console.log(`[FOODFLOW SERVER] Dist directory path: ${distPath}`);
+console.log(`[FOODFLOW SERVER] index.html exists: ${fs.existsSync(indexPath)}`);
 
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
 }
 
-app.use((req, res, next) => {
+app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
   if (req.path.startsWith('/api')) return next();
   if (fs.existsSync(indexPath)) {
     return res.sendFile(indexPath);
   }
-  res.status(404).send('Frontend build not found. Please run npm run build.');
+  res.status(404).send(`Frontend build not found at ${indexPath}. Please run npm run build.`);
 });
 
 export default app;
