@@ -26,7 +26,41 @@ export async function sendOtpViaSmsOrEmail(
       </div>
     `;
 
-    // 1A. Resend HTTP API (Port 443 - Recommended for Render Cloud)
+    // 1A. Brevo / Sendinblue HTTP API (Port 443 - Universal delivery to ANY recipient email)
+    const brevoApiKey = process.env.BREVO_API_KEY || process.env.SENDINBLUE_API_KEY;
+    if (brevoApiKey) {
+      try {
+        const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+          method: 'POST',
+          headers: {
+            'api-key': brevoApiKey,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            sender: { name: 'FoodFlow Security', email: process.env.GMAIL_USER || 'lingeswarandhanapal7@gmail.com' },
+            to: [{ email: cleanTarget }],
+            subject: `🔐 FoodFlow Verification Code: ${code}`,
+            htmlContent: emailHtml
+          })
+        });
+
+        if (response.ok) {
+          console.log(`[FOODFLOW OTP SERVICE] 📧 Real Email OTP delivered via Brevo to ${cleanTarget}`);
+          return {
+            success: true,
+            provider: 'smtp',
+            message: `Real verification OTP email sent to ${cleanTarget}`
+          };
+        } else {
+          const errData = await response.text();
+          console.error('[FOODFLOW OTP SERVICE] Brevo API error:', errData);
+        }
+      } catch (err: any) {
+        console.error('[FOODFLOW OTP SERVICE] Brevo API error:', err.message);
+      }
+    }
+
+    // 1B. Resend HTTP API (Port 443 - Recommended for Render Cloud)
     const resendApiKey = process.env.RESEND_API_KEY;
     if (resendApiKey) {
       try {
@@ -61,40 +95,6 @@ export async function sendOtpViaSmsOrEmail(
         }
       } catch (err: any) {
         console.error('[FOODFLOW OTP SERVICE] Resend API error:', err.message);
-      }
-    }
-
-    // 1B. Brevo / Sendinblue HTTP API (Port 443 - Recommended for Render Cloud)
-    const brevoApiKey = process.env.BREVO_API_KEY || process.env.SENDINBLUE_API_KEY;
-    if (brevoApiKey) {
-      try {
-        const response = await fetch('https://api.brevo.com/v3/smtp/email', {
-          method: 'POST',
-          headers: {
-            'api-key': brevoApiKey,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            sender: { name: 'FoodFlow Security', email: process.env.GMAIL_USER || 'lingeswarandhanapal7@gmail.com' },
-            to: [{ email: cleanTarget }],
-            subject: `🔐 FoodFlow Verification Code: ${code}`,
-            htmlContent: emailHtml
-          })
-        });
-
-        if (response.ok) {
-          console.log(`[FOODFLOW OTP SERVICE] 📧 Real Email OTP delivered via Brevo to ${cleanTarget}`);
-          return {
-            success: true,
-            provider: 'smtp',
-            message: `Real verification OTP email sent to ${cleanTarget}`
-          };
-        } else {
-          const errData = await response.text();
-          console.error('[FOODFLOW OTP SERVICE] Brevo API error:', errData);
-        }
-      } catch (err: any) {
-        console.error('[FOODFLOW OTP SERVICE] Brevo API error:', err.message);
       }
     }
 
