@@ -13,8 +13,88 @@ export async function sendOtpViaSmsOrEmail(
 ): Promise<OtpDispatchResult> {
   const cleanTarget = target.trim();
 
-  // 1. Email OTP Dispatch via Nodemailer (SMTP / Gmail)
+  // 1. Email OTP Dispatch (Resend HTTP API / Brevo HTTP API / SendGrid HTTP API / Nodemailer SMTP)
   if (type === 'email' || cleanTarget.includes('@')) {
+    const emailHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 24px; background-color: #0f172a; color: #f8fafc; border-radius: 16px; border: 1px solid #1e293b;">
+        <h2 style="color: #ffffff; font-size: 20px; margin-bottom: 8px;">FoodFlow Verification</h2>
+        <p style="color: #94a3b8; font-size: 14px;">Your 6-digit verification code is:</p>
+        <div style="text-align: center; margin: 24px 0;">
+          <span style="font-family: monospace; font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #fbbf24; background-color: #1e293b; padding: 12px 24px; border-radius: 12px; border: 1px solid #334155; display: inline-block;">${code}</span>
+        </div>
+        <p style="color: #64748b; font-size: 12px; text-align: center;">Expires in 5 minutes. Do not share this code with anyone.</p>
+      </div>
+    `;
+
+    // 1A. Resend HTTP API (Port 443 - Recommended for Render Cloud)
+    const resendApiKey = process.env.RESEND_API_KEY;
+    if (resendApiKey) {
+      try {
+        const response = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${resendApiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            from: 'FoodFlow Security <onboarding@resend.dev>',
+            to: [cleanTarget],
+            subject: `🔐 FoodFlow Verification Code: ${code}`,
+            html: emailHtml
+          })
+        });
+
+        if (response.ok) {
+          console.log(`[FOODFLOW OTP SERVICE] 📧 Real Email OTP delivered via Resend to ${cleanTarget}`);
+          return {
+            success: true,
+            provider: 'smtp',
+            message: `Real verification OTP email sent to ${cleanTarget}`
+          };
+        } else {
+          const errData = await response.text();
+          console.error('[FOODFLOW OTP SERVICE] Resend API error:', errData);
+        }
+      } catch (err: any) {
+        console.error('[FOODFLOW OTP SERVICE] Resend API error:', err.message);
+      }
+    }
+
+    // 1B. Brevo / Sendinblue HTTP API (Port 443 - Recommended for Render Cloud)
+    const brevoApiKey = process.env.BREVO_API_KEY || process.env.SENDINBLUE_API_KEY;
+    if (brevoApiKey) {
+      try {
+        const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+          method: 'POST',
+          headers: {
+            'api-key': brevoApiKey,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            sender: { name: 'FoodFlow Security', email: 'security@foodflow.app' },
+            to: [{ email: cleanTarget }],
+            subject: `🔐 FoodFlow Verification Code: ${code}`,
+            htmlContent: emailHtml
+          })
+        });
+
+        if (response.ok) {
+          console.log(`[FOODFLOW OTP SERVICE] 📧 Real Email OTP delivered via Brevo to ${cleanTarget}`);
+          return {
+            success: true,
+            provider: 'smtp',
+            message: `Real verification OTP email sent to ${cleanTarget}`
+          };
+        } else {
+          const errData = await response.text();
+          console.error('[FOODFLOW OTP SERVICE] Brevo API error:', errData);
+        }
+      } catch (err: any) {
+        console.error('[FOODFLOW OTP SERVICE] Brevo API error:', err.message);
+      }
+    }
+
+    // 1C. Nodemailer SMTP (Port 587 / 465)
     const smtpUser = process.env.SMTP_USER || process.env.GMAIL_USER || (process.env as any).GNAIL_USER;
     const smtpPass = process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD || (process.env as any).GNAIL_APP_PASSWORD;
 
@@ -22,7 +102,7 @@ export async function sendOtpViaSmsOrEmail(
       return {
         success: false,
         provider: 'smtp',
-        message: 'GMAIL_USER or GMAIL_APP_PASSWORD environment variables are missing on server.'
+        message: 'GMAIL_USER / GMAIL_APP_PASSWORD or RESEND_API_KEY environment variables are missing on server.'
       };
     }
 
@@ -36,9 +116,9 @@ export async function sendOtpViaSmsOrEmail(
             requireTLS: true,
             auth: { user: smtpUser, pass: smtpPass },
             tls: { rejectUnauthorized: false },
-            connectionTimeout: 10000,
-            greetingTimeout: 8000,
-            socketTimeout: 10000
+            connectionTimeout: 8000,
+            greetingTimeout: 6000,
+            socketTimeout: 8000
           }
         : {
             host: process.env.SMTP_HOST,
@@ -46,9 +126,9 @@ export async function sendOtpViaSmsOrEmail(
             secure: Number(process.env.SMTP_PORT) === 465,
             auth: { user: smtpUser, pass: smtpPass },
             tls: { rejectUnauthorized: false },
-            connectionTimeout: 10000,
-            greetingTimeout: 8000,
-            socketTimeout: 10000
+            connectionTimeout: 8000,
+            greetingTimeout: 6000,
+            socketTimeout: 8000
           };
 
       const transporter = nodemailer.createTransport(transporterConfig);
@@ -57,25 +137,16 @@ export async function sendOtpViaSmsOrEmail(
         from: `"FoodFlow Security" <${smtpUser}>`,
         to: cleanTarget,
         subject: `🔐 FoodFlow Verification Code: ${code}`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 24px; background-color: #0f172a; color: #f8fafc; border-radius: 16px; border: 1px solid #1e293b;">
-            <h2 style="color: #ffffff; font-size: 20px; margin-bottom: 8px;">FoodFlow Verification</h2>
-            <p style="color: #94a3b8; font-size: 14px;">Your 6-digit verification code is:</p>
-            <div style="text-align: center; margin: 24px 0;">
-              <span style="font-family: monospace; font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #fbbf24; background-color: #1e293b; padding: 12px 24px; border-radius: 12px; border: 1px solid #334155; display: inline-block;">${code}</span>
-            </div>
-            <p style="color: #64748b; font-size: 12px; text-align: center;">Expires in 5 minutes. Do not share this code with anyone.</p>
-          </div>
-        `
+        html: emailHtml
       });
 
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('SMTP connection timed out after 10s')), 10000)
+        setTimeout(() => reject(new Error('SMTP connection timed out after 8s. Note: Render Free Tier blocks outbound SMTP ports 587/465. Use RESEND_API_KEY or BREVO_API_KEY for HTTP email delivery on Render.')), 8000)
       );
 
       await Promise.race([sendMailPromise, timeoutPromise]);
 
-      console.log(`[FOODFLOW OTP SERVICE] 📧 Real Email OTP delivered to ${cleanTarget}`);
+      console.log(`[FOODFLOW OTP SERVICE] 📧 Real Email OTP delivered via SMTP to ${cleanTarget}`);
       return {
         success: true,
         provider: 'smtp',
