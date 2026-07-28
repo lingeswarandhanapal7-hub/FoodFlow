@@ -46,8 +46,6 @@ export const AuthPortal: React.FC = () => {
   const [googleOtpSent, setGoogleOtpSent] = useState(false);
   const [googleOtpDigits, setGoogleOtpDigits] = useState(['', '', '', '', '', '']);
   const [googleOtpLoading, setGoogleOtpLoading] = useState(false);
-  const [googleOtpDemoCode, setGoogleOtpDemoCode] = useState('');
-  const [googleOtpProvider, setGoogleOtpProvider] = useState('');
 
   // OTP Countdown Timer Effect
   useEffect(() => {
@@ -168,12 +166,6 @@ export const AuthPortal: React.FC = () => {
       const res = await sendOtp(googleEmailInput.trim(), 'email');
       if (res.success) {
         setGoogleOtpSent(true);
-        if (res.demoOtp) {
-          setGoogleOtpDemoCode(res.demoOtp);
-        }
-        if (res.provider) {
-          setGoogleOtpProvider(res.provider);
-        }
       } else {
         alert(res.message || 'Failed to send OTP code. Please try again.');
       }
@@ -569,24 +561,9 @@ export const AuthPortal: React.FC = () => {
               {/* 6-Digit OTP Code Verification Input for Google Account */}
               {googleOtpSent && (
                 <div className="flex flex-col gap-2 pt-2 border-t border-slate-800 animate-fadeIn">
-                  {googleOtpProvider === 'smtp' ? (
-                    <div className="text-[11px] text-emerald-400 font-medium bg-emerald-950/40 border border-emerald-800/40 p-2.5 rounded-xl">
-                      ✉️ Real 6-Digit OTP sent to <strong>{googleEmailInput}</strong>. Please check your Inbox & Spam folder.
-                    </div>
-                  ) : (
-                    <div className="text-[11px] text-amber-300 font-medium bg-amber-950/40 border border-amber-800/40 p-2.5 rounded-xl flex items-center justify-between">
-                      <span>🧪 Sandbox Mode OTP: <strong className="text-amber-400 font-mono text-sm tracking-widest ml-1">{googleOtpDemoCode}</strong></span>
-                      {googleOtpDemoCode && (
-                        <button
-                          type="button"
-                          onClick={() => setGoogleOtpDigits(googleOtpDemoCode.split(''))}
-                          className="text-[10px] bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 px-2 py-1 rounded-lg border border-amber-500/40 transition-all font-bold"
-                        >
-                          Auto-Fill
-                        </button>
-                      )}
-                    </div>
-                  )}
+                  <div className="text-[11px] text-emerald-400 font-medium bg-emerald-950/40 border border-emerald-800/40 p-2.5 rounded-xl">
+                    ✉️ Real 6-Digit Verification OTP sent to <strong>{googleEmailInput}</strong>. Please check your Inbox & Spam folder.
+                  </div>
                   <div className="flex justify-between items-center mt-1">
                     <span className="text-[10px] text-slate-400 font-medium">Enter 6-Digit OTP Code:</span>
                   </div>

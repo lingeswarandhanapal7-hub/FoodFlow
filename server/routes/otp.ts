@@ -48,13 +48,15 @@ otpRouter.post('/auth/send-otp', async (req, res) => {
     // Dispatch via SMS / Email provider adapter
     const dispatch = await sendOtpViaSmsOrEmail(cleanTarget, code, type);
 
+    if (!dispatch.success) {
+      return res.status(400).json({ error: dispatch.message });
+    }
+
     res.json({
       success: true,
       message: dispatch.message,
       provider: dispatch.provider,
-      expiresInSeconds: 300,
-      // Provide demo OTP for instant sandbox testing when keys are omitted
-      demoOtp: code
+      expiresInSeconds: 300
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
