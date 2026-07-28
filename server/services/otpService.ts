@@ -52,8 +52,12 @@ export async function sendOtpViaSmsOrEmail(
             message: `Real verification OTP email sent to ${cleanTarget}`
           };
         } else {
-          const errData = await response.text();
-          console.error('[FOODFLOW OTP SERVICE] Resend API error:', errData);
+          const errData: any = await response.json().catch(() => null);
+          const errMsg = errData?.message || 'Resend delivery error';
+          console.error('[FOODFLOW OTP SERVICE] Resend API error:', errMsg);
+          if (errMsg.includes('own email address')) {
+            console.warn('[FOODFLOW OTP SERVICE] Note: Resend test domain (onboarding@resend.dev) restricts sending to external recipients.');
+          }
         }
       } catch (err: any) {
         console.error('[FOODFLOW OTP SERVICE] Resend API error:', err.message);
