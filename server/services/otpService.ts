@@ -75,7 +75,7 @@ export async function sendOtpViaSmsOrEmail(
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            sender: { name: 'FoodFlow Security', email: 'security@foodflow.app' },
+            sender: { name: 'FoodFlow Security', email: process.env.GMAIL_USER || 'lingeswarandhanapal7@gmail.com' },
             to: [{ email: cleanTarget }],
             subject: `🔐 FoodFlow Verification Code: ${code}`,
             htmlContent: emailHtml
